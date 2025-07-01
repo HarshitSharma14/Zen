@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
+import useAppStore from '../store/useAppStore';
 
 const MenuPage = () => {
     const [isLogin, setIsLogin] = useState(true);
+
+    const { setCurrentPage } = useAppStore()
 
     const containerVariants = {
         hidden: { opacity: 0 },
@@ -45,6 +48,10 @@ const MenuPage = () => {
             }
         }
     };
+
+    const navigateToHome = () => {
+        setCurrentPage('home')
+    }
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 overflow-hidden relative">
@@ -215,6 +222,7 @@ const MenuPage = () => {
                             borderColor: 'rgba(255,255,255,0.6)'
                         }}
                         whileTap={{ scale: 0.95 }}
+                        onClick={navigateToHome}
                     >
                         Continue Without Login
                     </motion.button>
