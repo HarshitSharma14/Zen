@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const SummaryStep = ({ sessionData, onStart, onPrev }) => {
@@ -21,19 +21,107 @@ const SummaryStep = ({ sessionData, onStart, onPrev }) => {
         }, 1000);
     };
 
-    // Format break details for display
-    const getBreakDetails = () => {
+    // Calculate session timeline
+    const sessionTimeline = useMemo(() => {
+        if (!sessionData.isTimeBound) {
+            return [{ type: 'focus', duration: '∞', label: 'Unlimited Focus Time' }];
+        }
+
+        const timeline = [];
+        let currentTime = 0;
+        const startTime = new Date();
+
+        const addSegment = (type, duration, label) => {
+            const segmentStart = new Date(startTime.getTime() + currentTime * 60000);
+            const segmentEnd = new Date(startTime.getTime() + (currentTime + duration) * 60000);
+
+            timeline.push({
+                type,
+                duration,
+                label,
+                cumulativeTime: currentTime + duration,
+                startTime: segmentStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                endTime: segmentEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            });
+            currentTime += duration;
+        };
+
         switch (sessionData.breakType) {
             case 'pomodoro':
-                return '🍅 25min focus + 5min breaks + long break after 4 cycles';
+                const totalMinutes = sessionData.totalTime;
+                const cycles = Math.floor(totalMinutes / 30); // 25 focus + 5 break = 30 min cycle
+                let remainingTime = totalMinutes;
+
+                for (let i = 0; i < cycles; i++) {
+                    // Focus period
+                    addSegment('focus', 25, `Focus Period ${i + 1}`);
+                    remainingTime -= 25;
+
+                    // Break (5 min normal, 15 min after every 4th cycle)
+                    if (remainingTime > 0) {
+                        const isLongBreak = (i + 1) % 4 === 0;
+                        const breakDuration = Math.min(isLongBreak ? 15 : 5, remainingTime);
+                        addSegment('break', breakDuration, isLongBreak ? `Long Break ${Math.floor(i / 4) + 1}` : `Break ${i + 1}`);
+                        remainingTime -= breakDuration;
+                    }
+                }
+
+                // Add remaining time as focus if any
+                if (remainingTime > 0) {
+                    addSegment('focus', remainingTime, `Final Focus`);
+                }
+                break;
+
             case 'regular':
-                return `⏱️ ${sessionData.regularBreaks.breakDuration} min breaks, ${sessionData.regularBreaks.numberOfBreaks} total`;
+                const { breakDuration, numberOfBreaks } = sessionData.regularBreaks;
+                const totalBreakTime = breakDuration * numberOfBreaks;
+                const totalFocusTime = sessionData.totalTime - totalBreakTime;
+                const focusPeriods = numberOfBreaks + 1;
+                const focusSegmentDuration = Math.round(totalFocusTime / focusPeriods);
+
+                for (let i = 0; i < focusPeriods; i++) {
+                    // Focus period
+                    addSegment('focus', focusSegmentDuration, `Focus Period ${i + 1}`);
+
+                    // Break (except after last focus period)
+                    if (i < numberOfBreaks) {
+                        addSegment('break', breakDuration, `Break ${i + 1}`);
+                    }
+                }
+                break;
+
             case 'custom':
-                return `🎯 ${sessionData.customBreaks.length} custom breaks configured`;
+                let remainingFocusTime = sessionData.totalTime;
+
+                // Sort custom breaks by afterFocusTime
+                const sortedBreaks = [...sessionData.customBreaks].sort((a, b) => a.afterFocusTime - b.afterFocusTime);
+
+                for (let i = 0; i < sortedBreaks.length; i++) {
+                    const breakItem = sortedBreaks[i];
+
+                    // Focus period before this break
+                    addSegment('focus', breakItem.afterFocusTime, `Focus Period ${i + 1}`);
+                    remainingFocusTime -= breakItem.afterFocusTime;
+
+                    // Break
+                    addSegment('break', breakItem.duration, `Break ${i + 1}`);
+                    remainingFocusTime -= breakItem.duration;
+                }
+
+                // Final focus period if any time remaining
+                if (remainingFocusTime > 0) {
+                    addSegment('focus', remainingFocusTime, `Final Focus`);
+                }
+                break;
+
             default:
-                return 'No breaks configured';
+                addSegment('focus', sessionData.totalTime, 'Focus Session');
         }
-    };
+
+        return timeline;
+    }, [sessionData]);
+
+    const totalSessionTime = sessionTimeline.reduce((total, segment) => total + (segment.duration === '∞' ? 0 : segment.duration), 0);
 
     const itemVariants = {
         hidden: { opacity: 0, y: 20 },
@@ -44,11 +132,11 @@ const SummaryStep = ({ sessionData, onStart, onPrev }) => {
         }
     };
 
-    const cardVariants = {
-        hidden: { opacity: 0, scale: 0.95 },
+    const timelineVariants = {
+        hidden: { opacity: 0, x: -20 },
         visible: {
             opacity: 1,
-            scale: 1,
+            x: 0,
             transition: { duration: 0.3, ease: "easeOut" }
         }
     };
@@ -131,60 +219,49 @@ const SummaryStep = ({ sessionData, onStart, onPrev }) => {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.6 }}
                     >
-                        Review Your Session
+                        Session Timeline Preview
                     </motion.h2>
+                    <p className="text-purple-200 mt-2">Your complete session schedule with exact timings</p>
                 </div>
 
                 {/* Main Content */}
                 <div className="flex-1 p-6 overflow-y-auto">
-                    <div className="max-w-4xl mx-auto space-y-6">
-                        {/* Session Overview Card */}
+                    <div className="max-w-5xl mx-auto space-y-6">
+                        {/* Session Overview */}
                         <motion.div
                             className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/20"
                             variants={itemVariants}
                             initial="hidden"
                             animate="visible"
                         >
-                            <h3 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
+                            <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
                                 <span className="text-2xl">📋</span>
                                 Session Overview
                             </h3>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <motion.div
-                                    className="bg-white/5 rounded-xl p-4 border border-white/10"
-                                    variants={cardVariants}
-                                    whileHover={{ scale: 1.02 }}
-                                >
-                                    <h4 className="text-purple-200 font-medium mb-2 flex items-center gap-2">
-                                        <span className="text-lg">✏️</span>
-                                        Session Name
-                                    </h4>
-                                    <p className="text-white text-lg font-semibold">
-                                        {sessionData.sessionName || 'Unnamed Session'}
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <div className="bg-white/5 rounded-xl p-4 text-center">
+                                    <h4 className="text-purple-200 text-sm font-medium mb-1">Session Name</h4>
+                                    <p className="text-white font-semibold">{sessionData.sessionName || 'Unnamed Session'}</p>
+                                </div>
+                                <div className="bg-white/5 rounded-xl p-4 text-center">
+                                    <h4 className="text-blue-200 text-sm font-medium mb-1">Total Duration</h4>
+                                    <p className="text-blue-400 text-xl font-bold">
+                                        {sessionData.isTimeBound ? `${totalSessionTime} min` : '∞'}
                                     </p>
-                                </motion.div>
-
-                                <motion.div
-                                    className="bg-white/5 rounded-xl p-4 border border-white/10"
-                                    variants={cardVariants}
-                                    whileHover={{ scale: 1.02 }}
-                                >
-                                    <h4 className="text-purple-200 font-medium mb-2 flex items-center gap-2">
-                                        <span className="text-lg">⏰</span>
-                                        Duration
-                                    </h4>
-                                    <p className="text-white text-lg font-semibold">
-                                        {sessionData.isTimeBound
-                                            ? `${sessionData.totalTime} minutes ${sessionData.isSessionTime ? '(total session)' : '(focus only)'}`
-                                            : 'Unlimited time'
-                                        }
-                                    </p>
-                                </motion.div>
+                                </div>
+                                <div className="bg-white/5 rounded-xl p-4 text-center">
+                                    <h4 className="text-green-200 text-sm font-medium mb-1">Focus Windows</h4>
+                                    <p className="text-green-400 text-xl font-bold">{sessionData.focusWindows?.length || 0}</p>
+                                </div>
+                                <div className="bg-white/5 rounded-xl p-4 text-center">
+                                    <h4 className="text-orange-200 text-sm font-medium mb-1">Break Windows</h4>
+                                    <p className="text-orange-400 text-xl font-bold">{sessionData.breakWindows?.length || 0}</p>
+                                </div>
                             </div>
                         </motion.div>
 
-                        {/* Break Configuration Card */}
+                        {/* Session Timeline */}
                         <motion.div
                             className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/20"
                             variants={itemVariants}
@@ -193,30 +270,77 @@ const SummaryStep = ({ sessionData, onStart, onPrev }) => {
                             transition={{ delay: 0.1 }}
                         >
                             <h3 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
-                                <span className="text-2xl">☕</span>
-                                Break Configuration
+                                <span className="text-2xl">⏱️</span>
+                                Session Timeline
                             </h3>
 
-                            <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-                                <h4 className="text-purple-200 font-medium mb-2">Break Type</h4>
-                                <p className="text-white text-lg font-semibold mb-2 capitalize">{sessionData.breakType}</p>
-                                <p className="text-purple-100 text-sm">{getBreakDetails()}</p>
+                            <div className="space-y-4">
+                                {sessionTimeline.map((segment, index) => (
+                                    <motion.div
+                                        key={index}
+                                        className={`relative flex items-center gap-6 p-4 rounded-xl border-2 ${segment.type === 'focus'
+                                            ? 'bg-green-500/10 border-green-400/30'
+                                            : 'bg-orange-500/10 border-orange-400/30'
+                                            }`}
+                                        variants={timelineVariants}
+                                        initial="hidden"
+                                        animate="visible"
+                                        transition={{ delay: index * 0.1 }}
+                                        whileHover={{ scale: 1.02 }}
+                                    >
+                                        {/* Timeline connector */}
+                                        {index < sessionTimeline.length - 1 && (
+                                            <div className="absolute left-8 top-16 w-0.5 h-8 bg-white/20"></div>
+                                        )}
 
-                                {/* Custom breaks details */}
-                                {sessionData.breakType === 'custom' && sessionData.customBreaks.length > 0 && (
-                                    <div className="mt-4 space-y-2">
-                                        <h5 className="text-purple-200 text-sm font-medium">Custom Break Schedule:</h5>
-                                        {sessionData.customBreaks.map((breakItem, index) => (
-                                            <div key={index} className="text-xs text-purple-100 bg-white/5 rounded p-2">
-                                                Break {index + 1}: {breakItem.duration} minutes after {breakItem.afterFocusTime} minutes of focus
+                                        {/* Icon */}
+                                        <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold ${segment.type === 'focus'
+                                            ? 'bg-green-500 text-white'
+                                            : 'bg-orange-500 text-white'
+                                            }`}>
+                                            {segment.type === 'focus' ? '🎯' : '☕'}
+                                        </div>
+
+                                        {/* Content */}
+                                        <div className="flex-1">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <h4 className={`font-semibold ${segment.type === 'focus' ? 'text-green-200' : 'text-orange-200'
+                                                    }`}>
+                                                    {segment.label}
+                                                </h4>
+                                                <div className="flex items-center gap-4">
+                                                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${segment.type === 'focus'
+                                                        ? 'bg-green-400/20 text-green-300'
+                                                        : 'bg-orange-400/20 text-orange-300'
+                                                        }`}>
+                                                        {segment.duration === '∞' ? '∞' : `${segment.duration} min`}
+                                                    </span>
+                                                </div>
                                             </div>
-                                        ))}
-                                    </div>
-                                )}
+
+                                            {sessionData.isTimeBound && segment.duration !== '∞' && (
+                                                <div className="grid grid-cols-3 gap-4 text-sm">
+                                                    <div>
+                                                        <span className="text-white/60">Start Time:</span>
+                                                        <p className="text-white font-medium">{segment.startTime}</p>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-white/60">End Time:</span>
+                                                        <p className="text-white font-medium">{segment.endTime}</p>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-white/60">Total Elapsed:</span>
+                                                        <p className="text-white font-medium">{segment.cumulativeTime} min</p>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </motion.div>
+                                ))}
                             </div>
                         </motion.div>
 
-                        {/* Windows Selection Card */}
+                        {/* Windows Selection Summary */}
                         <motion.div
                             className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/20"
                             variants={itemVariants}
@@ -226,7 +350,7 @@ const SummaryStep = ({ sessionData, onStart, onPrev }) => {
                         >
                             <h3 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
                                 <span className="text-2xl">🖼️</span>
-                                Selected Windows
+                                Window Configuration
                             </h3>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -237,11 +361,11 @@ const SummaryStep = ({ sessionData, onStart, onPrev }) => {
                                         Focus Windows ({sessionData.focusWindows?.length || 0})
                                     </h4>
                                     {sessionData.focusWindows?.length > 0 ? (
-                                        <div className="space-y-2">
-                                            {sessionData.focusWindows.map((window) => (
-                                                <div key={window.id} className="text-sm text-green-100 bg-green-500/10 rounded p-2 flex items-center gap-2">
-                                                    <span>{window.icon || '💻'}</span>
-                                                    <span>{window.name}</span>
+                                        <div className="space-y-2 max-h-32 overflow-y-auto">
+                                            {sessionData.focusWindows.map((window, index) => (
+                                                <div key={window.id || index} className="text-sm text-green-100 bg-green-500/10 rounded p-2 flex items-center gap-2">
+                                                    <span>💻</span>
+                                                    <span className="truncate">{window.name}</span>
                                                 </div>
                                             ))}
                                         </div>
@@ -257,11 +381,11 @@ const SummaryStep = ({ sessionData, onStart, onPrev }) => {
                                         Break Windows ({sessionData.breakWindows?.length || 0})
                                     </h4>
                                     {sessionData.breakWindows?.length > 0 ? (
-                                        <div className="space-y-2">
-                                            {sessionData.breakWindows.map((window) => (
-                                                <div key={window.id} className="text-sm text-orange-100 bg-orange-500/10 rounded p-2 flex items-center gap-2">
-                                                    <span>{window.icon || '🎵'}</span>
-                                                    <span>{window.name}</span>
+                                        <div className="space-y-2 max-h-32 overflow-y-auto">
+                                            {sessionData.breakWindows.map((window, index) => (
+                                                <div key={window.id || index} className="text-sm text-orange-100 bg-orange-500/10 rounded p-2 flex items-center gap-2">
+                                                    <span>🎵</span>
+                                                    <span className="truncate">{window.name}</span>
                                                 </div>
                                             ))}
                                         </div>
@@ -272,58 +396,13 @@ const SummaryStep = ({ sessionData, onStart, onPrev }) => {
                             </div>
                         </motion.div>
 
-                        {/* Quick Stats */}
-                        <motion.div
-                            className="bg-white/5 backdrop-blur-lg rounded-2xl p-6 border border-white/10"
-                            variants={itemVariants}
-                            initial="hidden"
-                            animate="visible"
-                            transition={{ delay: 0.3 }}
-                        >
-                            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                                <span className="text-xl">📊</span>
-                                Session Statistics
-                            </h3>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <div className="text-center">
-                                    <div className="text-2xl font-bold text-purple-400">
-                                        {sessionData.focusWindows?.length || 0}
-                                    </div>
-                                    <p className="text-purple-200 text-sm">Focus Apps</p>
-                                </div>
-                                <div className="text-center">
-                                    <div className="text-2xl font-bold text-orange-400">
-                                        {sessionData.breakWindows?.length || 0}
-                                    </div>
-                                    <p className="text-orange-200 text-sm">Break Apps</p>
-                                </div>
-                                <div className="text-center">
-                                    <div className="text-2xl font-bold text-blue-400">
-                                        {sessionData.isTimeBound ? sessionData.totalTime : '∞'}
-                                    </div>
-                                    <p className="text-blue-200 text-sm">Minutes</p>
-                                </div>
-                                <div className="text-center">
-                                    <div className="text-2xl font-bold text-green-400">
-                                        {sessionData.breakType === 'regular'
-                                            ? sessionData.regularBreaks?.numberOfBreaks || 0
-                                            : sessionData.breakType === 'custom'
-                                                ? sessionData.customBreaks?.length || 0
-                                                : sessionData.breakType === 'pomodoro' ? '4+' : '0'
-                                        }
-                                    </div>
-                                    <p className="text-green-200 text-sm">Breaks</p>
-                                </div>
-                            </div>
-                        </motion.div>
-
                         {/* Start Session Card */}
                         <motion.div
                             className="bg-gradient-to-r from-purple-500/20 via-pink-500/20 to-indigo-500/20 backdrop-blur-xl rounded-2xl p-8 border border-purple-400/30 text-center"
                             variants={itemVariants}
                             initial="hidden"
                             animate="visible"
-                            transition={{ delay: 0.4 }}
+                            transition={{ delay: 0.3 }}
                         >
                             <motion.div
                                 className="text-6xl mb-4"
@@ -335,17 +414,17 @@ const SummaryStep = ({ sessionData, onStart, onPrev }) => {
                             >
                                 🚀
                             </motion.div>
-                            <h3 className="text-2xl font-bold text-white mb-4">Ready to Start?</h3>
+                            <h3 className="text-2xl font-bold text-white mb-4">Ready to Begin?</h3>
                             <p className="text-purple-100 mb-6 max-w-md mx-auto">
-                                Your session is configured and ready to go. Click the button below to begin your focus journey!
+                                Your session timeline is set! Starting now will follow the exact schedule shown above.
                             </p>
 
                             <motion.button
                                 onClick={handleStart}
                                 disabled={isStarting}
                                 className={`px-12 py-4 text-xl font-bold rounded-2xl shadow-2xl transition-all ${isStarting
-                                        ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                                        : 'bg-gradient-to-r from-purple-500 via-pink-500 to-indigo-500 text-white hover:shadow-purple-500/50'
+                                    ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                                    : 'bg-gradient-to-r from-purple-500 via-pink-500 to-indigo-500 text-white hover:shadow-purple-500/50'
                                     }`}
                                 whileHover={!isStarting ? {
                                     scale: 1.05,
@@ -361,7 +440,7 @@ const SummaryStep = ({ sessionData, onStart, onPrev }) => {
 
                 {/* Navigation Footer */}
                 <div className="p-6 border-t border-white/10">
-                    <div className="max-w-4xl mx-auto flex justify-between items-center">
+                    <div className="max-w-5xl mx-auto flex justify-between items-center">
                         <motion.button
                             onClick={onPrev}
                             disabled={isStarting}
@@ -374,7 +453,7 @@ const SummaryStep = ({ sessionData, onStart, onPrev }) => {
 
                         <div className="flex items-center gap-2 text-white/60 text-sm">
                             <span className="text-green-400">✓</span>
-                            Session configured successfully
+                            Timeline configured • Starting {sessionData.isTimeBound ? `at ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'now'}
                         </div>
                     </div>
                 </div>
