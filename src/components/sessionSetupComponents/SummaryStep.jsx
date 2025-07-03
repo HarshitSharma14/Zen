@@ -1,10 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const SummaryStep = ({ sessionData, onStart, onPrev }) => {
     const [isStarting, setIsStarting] = useState(false);
     const [countdown, setCountdown] = useState(3);
-
+    // Add this after your existing useState declarations
+    const [currentTime, setCurrentTime] = useState(new Date());
     const handleStart = () => {
         setIsStarting(true);
         setCountdown(3);
@@ -13,13 +14,43 @@ const SummaryStep = ({ sessionData, onStart, onPrev }) => {
             setCountdown(prev => {
                 if (prev <= 1) {
                     clearInterval(timer);
-                    onStart();
+
+                    // Prepare complete session config with timeline
+                    const sessionConfig = {
+                        ...sessionData,
+                        timeline: sessionTimeline, // Include the calculated timeline
+                        startTime: new Date()
+                    };
+
+                    // Start session with config
+                    onStart(sessionConfig);
                     return 0;
                 }
                 return prev - 1;
             });
         }, 1000);
     };
+
+    // Add this useEffect after your existing state declarations
+    useEffect(() => {
+        const scheduleNextUpdate = () => {
+            const now = new Date();
+            // Calculate milliseconds until next minute boundary
+            const msUntilNextMinute = (60 - now.getSeconds()) * 1000 - now.getMilliseconds();
+
+            return setTimeout(() => {
+                setCurrentTime(new Date());
+                // Schedule the next update for the following minute
+                scheduleNextUpdate();
+            }, msUntilNextMinute);
+        };
+
+        // Schedule the first update
+        const timeoutId = scheduleNextUpdate();
+
+        // Cleanup on unmount
+        return () => clearTimeout(timeoutId);
+    }, []); // Empty dependency array - only run once on mount
 
     // Calculate session timeline
     const sessionTimeline = useMemo(() => {
@@ -119,7 +150,7 @@ const SummaryStep = ({ sessionData, onStart, onPrev }) => {
         }
 
         return timeline;
-    }, [sessionData]);
+    }, [sessionData, currentTime]);
 
     const totalSessionTime = sessionTimeline.reduce((total, segment) => total + (segment.duration === '∞' ? 0 : segment.duration), 0);
 
@@ -290,7 +321,7 @@ const SummaryStep = ({ sessionData, onStart, onPrev }) => {
                                     >
                                         {/* Timeline connector */}
                                         {index < sessionTimeline.length - 1 && (
-                                            <div className="absolute left-8 top-16 w-0.5 h-8 bg-white/20"></div>
+                                            <div className="absolute left-2 top-6 w-0.5 h-16 bg-white/20"></div>
                                         )}
 
                                         {/* Icon */}
@@ -453,7 +484,7 @@ const SummaryStep = ({ sessionData, onStart, onPrev }) => {
 
                         <div className="flex items-center gap-2 text-white/60 text-sm">
                             <span className="text-green-400">✓</span>
-                            Timeline configured • Starting {sessionData.isTimeBound ? `at ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'now'}
+                            Timeline configured • Starting {sessionData.isTimeBound ? `at ${currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'now'}
                         </div>
                     </div>
                 </div>

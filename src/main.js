@@ -42,8 +42,10 @@ ipcMain.handle('get-available-windows', async () => {
     // Get all available windows with thumbnails
     const sources = await desktopCapturer.getSources({
       types: ['window'],
-      thumbnailSize: { width: 300, height: 200 }
+      thumbnailSize: { width: 800, height: 600 },
+      fetchWindowIcons: true // Also get app icons for better visuals
     })
+
 
     // Filter out our own app and system windows
     const windows = sources
@@ -56,7 +58,8 @@ ipcMain.handle('get-available-windows', async () => {
       .map(source => ({
         id: source.id,
         name: source.name,
-        thumbnail: source.thumbnail.toDataURL() // Convert to base64
+        thumbnail: source.thumbnail.toDataURL(), // Convert to base64
+        appIcon: source.appIcon ? source.appIcon.toDataURL() : null // ✅ This will now work
       }))
 
     console.log(`Found ${windows.length} windows`)

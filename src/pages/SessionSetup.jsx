@@ -40,9 +40,17 @@ const SessionSetup = () => {
         setCurrentPage('home');
     };
 
-    const startSession = () => {
-        // You can save sessionData to your store here if needed
-        console.log('Starting session with data:', sessionData);
+    const startSession = (sessionConfig) => {
+        // Save to Zustand store
+        const { saveSessionConfig, startSession: startActiveSession } = useAppStore.getState();
+
+        console.log('Starting session with config:', sessionConfig);
+
+        // Save configuration and start the session
+        saveSessionConfig(sessionConfig);
+        startActiveSession(sessionConfig);
+
+        // Navigate to active session page
         setCurrentPage('session');
     };
 

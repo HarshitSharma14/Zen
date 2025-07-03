@@ -12,7 +12,7 @@ const WindowSelectionDialog = ({ isOpen, onClose, onSelect, type, selectedTypeWi
         try {
 
             const availableWindows = await window.electronAPI.getAvailableWindows();
-            // console.log(window.electronAPI)// Call Electron API to get available windows
+            console.log(availableWindows)// Call Electron API to get available windows
             setWindows(availableWindows);
         } catch (error) {
             console.error('Error fetching windows:', error);
@@ -140,6 +140,7 @@ const WindowSelectionDialog = ({ isOpen, onClose, onSelect, type, selectedTypeWi
                                                     src={window.thumbnail}
                                                     alt={window.name}
                                                     className="w-full h-full object-cover"
+                                                    style={{ imageRendering: 'crisp-edges' }} // Sharper rendering
                                                 />
                                             ) : (
                                                 <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-700 to-gray-800">
@@ -184,9 +185,14 @@ const WindowSelectionDialog = ({ isOpen, onClose, onSelect, type, selectedTypeWi
                                                 </motion.div>
                                             )}
                                         </div>
+                                        {/* {console.log(window)} */}
 
                                         {/* Window name */}
                                         <div className="p-3">
+                                            {window.appIcon ? (<div className="absolute top-2 left-2 w-8 h-8 bg-black/50 rounded-full flex items-center justify-center">
+                                                <img src={window.appIcon} className="w-6 h-6" alt="App icon" />
+                                            </div>) : (<></>)}
+
                                             <p className="text-white font-medium text-sm truncate">
                                                 {window.name}
                                             </p>
@@ -249,7 +255,7 @@ const WindowsStep = ({ sessionData, setSessionData, onNext, onPrev }) => {
 
     // Validation - both focus and break windows should be selected
     const isValid = () => {
-        return sessionData.focusWindows.length > 0 && sessionData.breakWindows.length > 0;
+        return sessionData.focusWindows.length > 0;
     };
 
     const itemVariants = {

@@ -5,10 +5,10 @@ import PageLoader from './components/PageLoader'
 
 // Lazy load components
 const pages = {
-    menu: React.lazy(() => import('./pages/MenuPage')),
-    home: React.lazy(() => import('./pages/HomePage')),
+    'menu': React.lazy(() => import('./pages/MenuPage')),
+    'home': React.lazy(() => import('./pages/HomePage')),
     'session-setup': React.lazy(() => import('./pages/SessionSetup')),
-    // session: React.lazy(() => import('./pages/ActiveSession')),
+    'session': React.lazy(() => import('./pages/ActiveSessionPage')),
     // settings: React.lazy(() => import('./pages/Settings'))
 }
 
