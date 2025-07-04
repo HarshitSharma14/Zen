@@ -255,7 +255,7 @@ const WindowsStep = ({ sessionData, setSessionData, onNext, onPrev }) => {
 
     // Validation - both focus and break windows should be selected
     const isValid = () => {
-        // return sessionData.focusWindows.length > 0;
+        return sessionData.focusWindows.length > 0;
         return true
     };
 

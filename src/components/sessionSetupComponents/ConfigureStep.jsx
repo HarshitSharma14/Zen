@@ -16,6 +16,8 @@ const ConfigureStep = ({ sessionData, setSessionData, onNext, onPrev, canGoNext 
     const [showTimeAlert, setShowTimeAlert] = useState(false);
     const [pendingChange, setPendingChange] = useState(null);
 
+
+
     // Calculate total time needed for custom breaks
     const calculateCustomBreaksTotal = (breaks) => {
         const totalFocusTime = breaks.reduce((sum, breakItem) => sum + (breakItem.afterFocusTime || 0), 0);
@@ -29,7 +31,7 @@ const ConfigureStep = ({ sessionData, setSessionData, onNext, onPrev, canGoNext 
     };
 
     // Validation function
-    const validateTimeChange = (newBreaks, changeType, changeData) => {
+    const validateTimeChange = (newBreaks, changeType, changeData, originalValue) => {
         const totals = calculateCustomBreaksTotal(newBreaks);
         const userTotalTime = sessionData.totalTime;
         const isSessionTime = sessionData.isSessionTime;
@@ -46,7 +48,8 @@ const ConfigureStep = ({ sessionData, setSessionData, onNext, onPrev, canGoNext 
             data: changeData,
             newBreaks: newBreaks,
             newTotal: relevantTotal,
-            currentTotal: userTotalTime
+            currentTotal: userTotalTime,
+            originalValue: originalValue
         });
         setShowTimeAlert(true);
         return false;
@@ -77,16 +80,17 @@ const ConfigureStep = ({ sessionData, setSessionData, onNext, onPrev, canGoNext 
     };
 
     const updateCustomBreak = (index, field, value) => {
+        const originalValue = customBreaks[index][field]; // Store original
         const updated = [...customBreaks];
         updated[index][field] = Math.max(1, parseInt(value) || 1);
         if (value === '') {
             updated[index][field] = ''
         }
-        if (!validateTimeChange(updated, 'update', { index, field, value })) {
+        setSessionData(prev => ({ ...prev, customBreaks: updated }));
+        if (!validateTimeChange(updated, 'update', { index, field, value, originalValue })) {
             return; // Will show alert
         }
-        console.log('in')
-        setSessionData(prev => ({ ...prev, customBreaks: updated }));
+        // setSessionData(prev => ({ ...prev, customBreaks: updated }));
     };
 
     const removeCustomBreak = (index) => {
@@ -106,6 +110,15 @@ const ConfigureStep = ({ sessionData, setSessionData, onNext, onPrev, canGoNext 
                 totalTime: pendingChange.newTotal,
                 customBreaks: pendingChange.newBreaks
             }));
+        }
+        else {
+            console.log('yea')
+            if (pendingChange?.data?.originalValue !== undefined) {
+                const { index, field, originalValue } = pendingChange.data;
+                const restored = [...customBreaks];
+                restored[index][field] = originalValue;
+                setSessionData(prev => ({ ...prev, customBreaks: restored }));
+            }
         }
         // If cancelled, just close alert (no changes applied)
 

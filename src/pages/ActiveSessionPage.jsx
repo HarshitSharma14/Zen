@@ -451,7 +451,7 @@ const ActiveSessionPage = () => {
                                 const scale = Math.max(0.3, 1.3 - (distanceFromCenter * 0.1));
                                 const opacity = Math.max(0.2, 1 - (distanceFromCenter * 0.2));
                                 const originalIndex = currentSegmentIndex - 1 - reverseIndex;
-                                const startTime = new Date(activeSession.startTime.getTime() + segment.cumulativeStart * 60000);
+                                const startTime = new Date(new Date(activeSession.startTime).getTime() + segment.cumulativeStart * 60000);
 
                                 return (
                                     <motion.div
@@ -589,7 +589,7 @@ const ActiveSessionPage = () => {
                                 </h2>
                                 <p className="text-white/80 text-xl">
                                     {(() => {
-                                        const startTime = new Date(activeSession.startTime.getTime() + processedTimeline[currentSegmentIndex]?.cumulativeStart * 60000);
+                                        const startTime = new Date(new Date(activeSession.startTime).getTime() + processedTimeline[currentSegmentIndex]?.cumulativeStart * 60000);
                                         const endTime = new Date(startTime.getTime() + processedTimeline[currentSegmentIndex]?.duration * 60000);
                                         return `${startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${endTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
                                     })()}
@@ -604,7 +604,7 @@ const ActiveSessionPage = () => {
                                 const scale = Math.max(0.3, 1.3 - (distanceFromCenter * 0.1));
                                 const opacity = Math.max(0.2, 1 - (distanceFromCenter * 0.2));
                                 const originalIndex = currentSegmentIndex + 1 + index;
-                                const startTime = new Date(activeSession.startTime.getTime() + segment.cumulativeStart * 60000);
+                                const startTime = new Date(new Date(activeSession.startTime).getTime() + segment.cumulativeStart * 60000);
 
                                 return (
                                     <motion.div

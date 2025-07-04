@@ -33,6 +33,7 @@ const SummaryStep = ({ sessionData, onStart, onPrev }) => {
 
     // Add this useEffect after your existing state declarations
     useEffect(() => {
+        if (isStarting) return
         const scheduleNextUpdate = () => {
             const now = new Date();
             // Calculate milliseconds until next minute boundary
@@ -50,7 +51,7 @@ const SummaryStep = ({ sessionData, onStart, onPrev }) => {
 
         // Cleanup on unmount
         return () => clearTimeout(timeoutId);
-    }, []); // Empty dependency array - only run once on mount
+    }, [isStarting]); // Empty dependency array - only run once on mount
 
     // Calculate session timeline
     const sessionTimeline = useMemo(() => {
@@ -77,14 +78,16 @@ const SummaryStep = ({ sessionData, onStart, onPrev }) => {
             currentTime += duration;
         };
 
-        let timeUsed = 0;
-        let focusTimeUsed = 0;
-        let cycleCount = 0;
-        switch (sessionData.breakType) {
-            case 'pomodoro':
 
+        switch (sessionData.breakType) {
+            case 'pomodoro': {
+                console.log(sessionData)
+                let timeUsed = 0;
+                let focusTimeUsed = 0;
+                let cycleCount = 0;
                 while (true) {
                     // Determine how much focus time we can add
+                    console.log(cycleCount)
                     let focusTime = 25; // Standard pomodoro focus time
 
                     if (sessionData.isSessionTime) {
@@ -127,8 +130,10 @@ const SummaryStep = ({ sessionData, onStart, onPrev }) => {
                     if (sessionData.isSessionTime && timeUsed >= sessionData.totalTime) break;
                 }
                 break;
-
-            case 'regular':
+            }
+            case 'regular': {
+                let timeUsed = 0;
+                let focusTimeUsed = 0;
                 const { breakDuration, breakAfterFocusTime } = sessionData.regularBreaks;
                 let periodCount = 0;
 
@@ -175,8 +180,8 @@ const SummaryStep = ({ sessionData, onStart, onPrev }) => {
                     if (sessionData.isSessionTime && timeUsed >= sessionData.totalTime) break;
                 }
                 break;
-
-            case 'custom':
+            }
+            case 'custom': {
                 let timeUsed = 0;
                 let focusTimeUsed = 0;
 
@@ -235,6 +240,7 @@ const SummaryStep = ({ sessionData, onStart, onPrev }) => {
                     addSegment('focus', remainingTime, 'Final Focus');
                 }
                 break;
+            }
             default:
                 addSegment('focus', sessionData.totalTime, 'Focus Session');
         }
