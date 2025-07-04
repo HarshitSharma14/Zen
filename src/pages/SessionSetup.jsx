@@ -17,7 +17,7 @@ const SessionSetup = () => {
         breakType: 'regular',
         regularBreaks: {
             breakDuration: 5,
-            numberOfBreaks: 3
+            breakAfterFocusTime: 3
         },
         customBreaks: [],
         focusWindows: [],

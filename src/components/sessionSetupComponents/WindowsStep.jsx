@@ -255,7 +255,8 @@ const WindowsStep = ({ sessionData, setSessionData, onNext, onPrev }) => {
 
     // Validation - both focus and break windows should be selected
     const isValid = () => {
-        return sessionData.focusWindows.length > 0;
+        // return sessionData.focusWindows.length > 0;
+        return true
     };
 
     const itemVariants = {
@@ -275,6 +276,7 @@ const WindowsStep = ({ sessionData, setSessionData, onNext, onPrev }) => {
             transition: { duration: 0.3, ease: "easeOut" }
         }
     };
+
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 relative overflow-hidden">
