@@ -77,74 +77,164 @@ const SummaryStep = ({ sessionData, onStart, onPrev }) => {
             currentTime += duration;
         };
 
+        let timeUsed = 0;
+        let focusTimeUsed = 0;
+        let cycleCount = 0;
         switch (sessionData.breakType) {
             case 'pomodoro':
-                const totalMinutes = sessionData.totalTime;
-                const cycles = Math.floor(totalMinutes / 30); // 25 focus + 5 break = 30 min cycle
-                let remainingTime = totalMinutes;
 
-                for (let i = 0; i < cycles; i++) {
-                    // Focus period
-                    addSegment('focus', 25, `Focus Period ${i + 1}`);
-                    remainingTime -= 25;
+                while (true) {
+                    // Determine how much focus time we can add
+                    let focusTime = 25; // Standard pomodoro focus time
 
-                    // Break (5 min normal, 15 min after every 4th cycle)
-                    if (remainingTime > 0) {
-                        const isLongBreak = (i + 1) % 4 === 0;
-                        const breakDuration = Math.min(isLongBreak ? 15 : 5, remainingTime);
-                        addSegment('break', breakDuration, isLongBreak ? `Long Break ${Math.floor(i / 4) + 1}` : `Break ${i + 1}`);
-                        remainingTime -= breakDuration;
+                    if (sessionData.isSessionTime) {
+                        // Total time includes breaks - check remaining total time
+                        const remainingTotal = sessionData.totalTime - timeUsed;
+                        focusTime = Math.min(25, remainingTotal);
+                    } else {
+                        // Total time is focus only - check remaining focus time
+                        const remainingFocus = sessionData.totalTime - focusTimeUsed;
+                        focusTime = Math.min(25, remainingFocus);
                     }
-                }
 
-                // Add remaining time as focus if any
-                if (remainingTime > 0) {
-                    addSegment('focus', remainingTime, `Final Focus`);
+                    if (focusTime <= 0) break;
+
+                    addSegment('focus', focusTime, `Focus Period ${cycleCount + 1}`);
+                    timeUsed += focusTime;
+                    focusTimeUsed += focusTime;
+
+                    // Check if we've reached our focus time limit (for focus-only mode)
+                    if (!sessionData.isSessionTime && focusTimeUsed >= sessionData.totalTime) break;
+
+                    // Add break if there's time/need
+                    const isLongBreak = (cycleCount + 1) % 4 === 0;
+                    let breakTime = isLongBreak ? 15 : 5; // Standard break times
+
+                    if (sessionData.isSessionTime) {
+                        // Break counts toward total time - check if it fits
+                        const remainingTotal = sessionData.totalTime - timeUsed;
+                        breakTime = Math.min(breakTime, remainingTotal);
+
+                        if (breakTime <= 0) break; // No time left for break
+                    }
+
+                    addSegment('break', breakTime, isLongBreak ? `Long Break ${Math.floor(cycleCount / 4) + 1}` : `Break ${cycleCount + 1}`);
+                    timeUsed += breakTime;
+
+                    cycleCount++;
+
+                    // Check if we've used up total session time (for total-time mode)
+                    if (sessionData.isSessionTime && timeUsed >= sessionData.totalTime) break;
                 }
                 break;
 
             case 'regular':
-                const { breakDuration, numberOfBreaks } = sessionData.regularBreaks;
-                const totalBreakTime = breakDuration * numberOfBreaks;
-                const totalFocusTime = sessionData.totalTime - totalBreakTime;
-                const focusPeriods = numberOfBreaks + 1;
-                const focusSegmentDuration = Math.round(totalFocusTime / focusPeriods);
+                const { breakDuration, breakAfterFocusTime } = sessionData.regularBreaks;
+                let periodCount = 0;
 
-                for (let i = 0; i < focusPeriods; i++) {
-                    // Focus period
-                    addSegment('focus', focusSegmentDuration, `Focus Period ${i + 1}`);
+                while (true) {
+                    // Add focus segment
+                    let focusTime = breakAfterFocusTime;
 
-                    // Break (except after last focus period)
-                    if (i < numberOfBreaks) {
-                        addSegment('break', breakDuration, `Break ${i + 1}`);
+                    if (sessionData.isSessionTime) {
+                        // Total time includes breaks - check remaining total time
+                        const remainingTotal = sessionData.totalTime - timeUsed;
+                        focusTime = Math.min(breakAfterFocusTime, remainingTotal);
+                    } else {
+                        // Total time is focus only - check remaining focus time
+                        const remainingFocus = sessionData.totalTime - focusTimeUsed;
+                        focusTime = Math.min(breakAfterFocusTime, remainingFocus);
                     }
+
+                    if (focusTime <= 0) break;
+
+                    addSegment('focus', focusTime, `Focus Period ${periodCount + 1}`);
+                    timeUsed += focusTime;
+                    focusTimeUsed += focusTime;
+
+                    // Check if we've reached our focus time limit (for focus-only mode)
+                    if (!sessionData.isSessionTime && focusTimeUsed >= sessionData.totalTime) break;
+
+                    // Add break if there's time/need
+                    let breakTime = breakDuration;
+
+                    if (sessionData.isSessionTime) {
+                        // Break counts toward total time - check if it fits
+                        const remainingTotal = sessionData.totalTime - timeUsed;
+                        breakTime = Math.min(breakDuration, remainingTotal);
+
+                        if (breakTime <= 0) break; // No time left for break
+                    }
+
+                    addSegment('break', breakTime, `Break ${periodCount + 1}`);
+                    timeUsed += breakTime;
+
+                    periodCount++;
+
+                    // Check if we've used up total session time (for total-time mode)
+                    if (sessionData.isSessionTime && timeUsed >= sessionData.totalTime) break;
                 }
                 break;
 
             case 'custom':
-                let remainingFocusTime = sessionData.totalTime;
+                let timeUsed = 0;
+                let focusTimeUsed = 0;
 
-                // Sort custom breaks by afterFocusTime
-                const sortedBreaks = [...sessionData.customBreaks].sort((a, b) => a.afterFocusTime - b.afterFocusTime);
+                // Add all custom break segments
+                for (let i = 0; i < sessionData.customBreaks.length; i++) {
+                    const breakItem = sessionData.customBreaks[i];
 
-                for (let i = 0; i < sortedBreaks.length; i++) {
-                    const breakItem = sortedBreaks[i];
+                    // Add focus segment
+                    let focusTime = breakItem.afterFocusTime;
 
-                    // Focus period before this break
-                    addSegment('focus', breakItem.afterFocusTime, `Focus Period ${i + 1}`);
-                    remainingFocusTime -= breakItem.afterFocusTime;
+                    if (sessionData.isSessionTime) {
+                        // Check remaining total time
+                        const remainingTotal = sessionData.totalTime - timeUsed;
+                        focusTime = Math.min(breakItem.afterFocusTime, remainingTotal);
+                    } else {
+                        // Check remaining focus time  
+                        const remainingFocus = sessionData.totalTime - focusTimeUsed;
+                        focusTime = Math.min(breakItem.afterFocusTime, remainingFocus);
+                    }
 
-                    // Break
-                    addSegment('break', breakItem.duration, `Break ${i + 1}`);
-                    remainingFocusTime -= breakItem.duration;
+                    if (focusTime <= 0) break;
+
+                    addSegment('focus', focusTime, `Focus Period ${i + 1}`);
+                    timeUsed += focusTime;
+                    focusTimeUsed += focusTime;
+
+                    // Check if focus time limit reached (focus-only mode)
+                    if (!sessionData.isSessionTime && focusTimeUsed >= sessionData.totalTime) break;
+
+                    // Add break
+                    let breakTime = breakItem.duration;
+
+                    if (sessionData.isSessionTime) {
+                        // Break counts toward total time
+                        const remainingTotal = sessionData.totalTime - timeUsed;
+                        breakTime = Math.min(breakItem.duration, remainingTotal);
+                        if (breakTime <= 0) break;
+                    }
+
+                    addSegment('break', breakTime, `Break ${i + 1}`);
+                    timeUsed += breakTime;
+
+                    // Check if total session time used up
+                    if (sessionData.isSessionTime && timeUsed >= sessionData.totalTime) break;
                 }
 
-                // Final focus period if any time remaining
-                if (remainingFocusTime > 0) {
-                    addSegment('focus', remainingFocusTime, `Final Focus`);
+                // Add remaining time as final focus
+                let remainingTime = 0;
+                if (sessionData.isSessionTime) {
+                    remainingTime = sessionData.totalTime - timeUsed;
+                } else {
+                    remainingTime = sessionData.totalTime - focusTimeUsed;
+                }
+
+                if (remainingTime > 0) {
+                    addSegment('focus', remainingTime, 'Final Focus');
                 }
                 break;
-
             default:
                 addSegment('focus', sessionData.totalTime, 'Focus Session');
         }

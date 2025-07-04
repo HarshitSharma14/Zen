@@ -1,5 +1,6 @@
-import React from 'react';
-import { motion } from 'framer-motion';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+
 
 const ConfigureStep = ({ sessionData, setSessionData, onNext, onPrev, canGoNext }) => {
     const {
@@ -12,7 +13,48 @@ const ConfigureStep = ({ sessionData, setSessionData, onNext, onPrev, canGoNext 
         customBreaks
     } = sessionData;
 
+    const [showTimeAlert, setShowTimeAlert] = useState(false);
+    const [pendingChange, setPendingChange] = useState(null);
+
+    // Calculate total time needed for custom breaks
+    const calculateCustomBreaksTotal = (breaks) => {
+        const totalFocusTime = breaks.reduce((sum, breakItem) => sum + (breakItem.afterFocusTime || 0), 0);
+        const totalBreakTime = breaks.reduce((sum, breakItem) => sum + (breakItem.duration || 0), 0);
+
+        return {
+            focusTime: totalFocusTime,
+            breakTime: totalBreakTime,
+            sessionTime: totalFocusTime + totalBreakTime
+        };
+    };
+
+    // Validation function
+    const validateTimeChange = (newBreaks, changeType, changeData) => {
+        const totals = calculateCustomBreaksTotal(newBreaks);
+        const userTotalTime = sessionData.totalTime;
+        const isSessionTime = sessionData.isSessionTime;
+
+        const relevantTotal = isSessionTime ? totals.sessionTime : totals.focusTime;
+
+        if (relevantTotal <= userTotalTime) {
+            return true; // Valid - no need for alert
+        }
+
+        // Show alert for user decision
+        setPendingChange({
+            type: changeType,
+            data: changeData,
+            newBreaks: newBreaks,
+            newTotal: relevantTotal,
+            currentTotal: userTotalTime
+        });
+        setShowTimeAlert(true);
+        return false;
+    };
+
+
     const updateField = (field, value) => {
+        console.log(field, value)
         setSessionData(prev => ({ ...prev, [field]: value }));
     };
 
@@ -24,15 +66,26 @@ const ConfigureStep = ({ sessionData, setSessionData, onNext, onPrev, canGoNext 
     };
 
     const addCustomBreak = () => {
+        const newBreaks = [...customBreaks, { duration: '', afterFocusTime: '' }];
+        if (!validateTimeChange(newBreaks, 'add', null)) {
+            return; // Will show alert
+        }
         setSessionData(prev => ({
             ...prev,
-            customBreaks: [...prev.customBreaks, { duration: 5, afterFocusTime: 25 }]
+            customBreaks: newBreaks
         }));
     };
 
     const updateCustomBreak = (index, field, value) => {
         const updated = [...customBreaks];
         updated[index][field] = Math.max(1, parseInt(value) || 1);
+        if (value === '') {
+            updated[index][field] = ''
+        }
+        if (!validateTimeChange(updated, 'update', { index, field, value })) {
+            return; // Will show alert
+        }
+        console.log('in')
         setSessionData(prev => ({ ...prev, customBreaks: updated }));
     };
 
@@ -43,15 +96,40 @@ const ConfigureStep = ({ sessionData, setSessionData, onNext, onPrev, canGoNext 
         }));
     };
 
+
+    // Handle user decision from alert
+    const handleTimeAlertDecision = (allowIncrease) => {
+        if (allowIncrease && pendingChange) {
+            // Update total time and apply the change
+            setSessionData(prev => ({
+                ...prev,
+                totalTime: pendingChange.newTotal,
+                customBreaks: pendingChange.newBreaks
+            }));
+        }
+        // If cancelled, just close alert (no changes applied)
+
+        setShowTimeAlert(false);
+        setPendingChange(null);
+    };
+
     // Validation helpers
     const handleNumberInput = (field, value, min = 1, max = 999) => {
         const numValue = parseInt(value) || min;
+        if (value === '') {
+            updateField(field, '');
+            return;
+        }
         const clampedValue = Math.max(min, Math.min(max, numValue));
         updateField(field, clampedValue);
     };
 
     const handleRegularBreakInput = (field, value, min = 1, max = 999) => {
         const numValue = parseInt(value) || min;
+        if (value === '') {
+            updateRegularBreaks(field, '');
+            return;
+        }
         const clampedValue = Math.max(min, Math.min(max, numValue));
         updateRegularBreaks(field, clampedValue);
     };
@@ -59,10 +137,10 @@ const ConfigureStep = ({ sessionData, setSessionData, onNext, onPrev, canGoNext 
     // Validation logic
     const isValid = () => {
         if (!sessionName.trim()) return false;
-        if (isTimeBound && (!totalTime || totalTime < 1)) return false;
+        if (isTimeBound && (!totalTime || totalTime < 1 || totalTime === '')) return false;
         if (breakType === 'regular') {
             if (!regularBreaks.breakDuration || regularBreaks.breakDuration < 1) return false;
-            if (regularBreaks.numberOfBreaks < 0) return false;
+            if (!regularBreaks.breakAfterFocusTime || regularBreaks.breakAfterFocusTime < 0) return false;
         }
         if (breakType === 'custom') {
             return customBreaks.every(b => b.duration >= 1 && b.afterFocusTime >= 1);
@@ -77,6 +155,67 @@ const ConfigureStep = ({ sessionData, setSessionData, onNext, onPrev, canGoNext 
             y: 0,
             transition: { duration: 0.4, ease: "easeOut" }
         }
+    };
+
+
+    // Alert/Toast Component
+    const TimeExceedsAlert = () => {
+        if (!showTimeAlert || !pendingChange) return null;
+
+        const timeType = sessionData.isSessionTime ? 'session' : 'focus';
+
+        return (
+            <motion.div
+                className="fixed inset-0 bg-black/50 backdrop-blur-3xl flex items-center justify-center z-50"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+            >
+                <motion.div
+                    className="bg-white/30 backdrop-blur-3xl rounded-2xl border border-white/20 p-6 max-w-md mx-4"
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.9, opacity: 0 }}
+                >
+                    <h3 className="text-xl font-semibold text-white mb-4">⚠️ Time Limit Exceeded</h3>
+
+                    <div className="space-y-3 mb-6">
+                        <p className="text-white/80">
+                            Your custom breaks require <strong>{pendingChange.newTotal} minutes</strong> of {timeType} time.
+                        </p>
+                        <p className="text-white/80">
+                            Current limit: <strong>{pendingChange.currentTotal} minutes</strong>
+                        </p>
+                        <p className="text-white/60 text-sm">
+                            {sessionData.isSessionTime
+                                ? 'This includes both focus and break time.'
+                                : 'This only counts focus time (breaks are additional).'
+                            }
+                        </p>
+                    </div>
+
+                    <div className="flex gap-3">
+                        <motion.button
+                            onClick={() => handleTimeAlertDecision(false)}
+                            className="flex-1 px-4 py-3 border border-white/30 text-white rounded-lg hover:bg-white/5 transition-colors"
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                        >
+                            Cancel Change
+                        </motion.button>
+
+                        <motion.button
+                            onClick={() => handleTimeAlertDecision(true)}
+                            className="flex-1 px-4 py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-lg hover:from-orange-600 hover:to-red-600 transition-colors"
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                        >
+                            Increase to {pendingChange.newTotal}m
+                        </motion.button>
+                    </div>
+                </motion.div>
+            </motion.div>
+        );
     };
 
     return (
@@ -173,8 +312,9 @@ const ConfigureStep = ({ sessionData, setSessionData, onNext, onPrev, canGoNext 
                                         <input
                                             type="number"
                                             value={totalTime}
+                                            onWheel={(e) => e.target.blur()} // This removes focus, so scroll won't change value
                                             onChange={(e) => handleNumberInput('totalTime', e.target.value, 1, 480)}
-                                            min="1"
+                                            // min="1"
                                             max="480"
                                             className={`w-full px-4 py-3 bg-white/10 border rounded-xl text-white focus:outline-none focus:ring-2 transition-all ${totalTime >= 1 ? 'border-green-400/50 focus:ring-green-400' : 'border-red-400/50 focus:ring-red-400'
                                                 }`}
@@ -221,8 +361,8 @@ const ConfigureStep = ({ sessionData, setSessionData, onNext, onPrev, canGoNext 
                                             key={option.key}
                                             onClick={() => updateField('breakType', option.key)}
                                             className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${breakType === option.key
-                                                    ? 'border-purple-400 bg-purple-400/20 shadow-lg'
-                                                    : 'border-white/20 bg-white/5 hover:border-white/40 hover:bg-white/10'
+                                                ? 'border-purple-400 bg-purple-400/20 shadow-lg'
+                                                : 'border-white/20 bg-white/5 hover:border-white/40 hover:bg-white/10'
                                                 }`}
                                             whileHover={{ scale: 1.02 }}
                                             whileTap={{ scale: 0.98 }}
@@ -249,6 +389,7 @@ const ConfigureStep = ({ sessionData, setSessionData, onNext, onPrev, canGoNext 
                                             <input
                                                 type="number"
                                                 value={regularBreaks.breakDuration}
+                                                onWheel={(e) => e.target.blur()} // This removes focus, so scroll won't change value
                                                 onChange={(e) => handleRegularBreakInput('breakDuration', e.target.value, 1, 60)}
                                                 min="1"
                                                 max="60"
@@ -258,14 +399,14 @@ const ConfigureStep = ({ sessionData, setSessionData, onNext, onPrev, canGoNext 
                                         </div>
                                         <div>
                                             <label className="block text-purple-200 text-sm font-medium mb-2">
-                                                Number of Breaks *
+                                                After Focus Time (minutes) *
                                             </label>
                                             <input
                                                 type="number"
-                                                value={regularBreaks.numberOfBreaks}
-                                                onChange={(e) => handleRegularBreakInput('numberOfBreaks', e.target.value, 0, 20)}
+                                                value={regularBreaks.breakAfterFocusTime}
+                                                onWheel={(e) => e.target.blur()} // This removes focus, so scroll won't change value
+                                                onChange={(e) => handleRegularBreakInput('breakAfterFocusTime', e.target.value, 0, 1000)}
                                                 min="0"
-                                                max="20"
                                                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-400 transition-all"
                                             />
                                         </div>
@@ -279,6 +420,9 @@ const ConfigureStep = ({ sessionData, setSessionData, onNext, onPrev, canGoNext 
                                         animate={{ opacity: 1, height: 'auto' }}
                                         transition={{ duration: 0.3 }}
                                     >
+                                        <AnimatePresence>
+                                            <TimeExceedsAlert />
+                                        </AnimatePresence>
                                         <div className="space-y-4 mb-6">
                                             {customBreaks.map((breakItem, index) => (
                                                 <motion.div
@@ -293,6 +437,7 @@ const ConfigureStep = ({ sessionData, setSessionData, onNext, onPrev, canGoNext 
                                                             <input
                                                                 type="number"
                                                                 value={breakItem.duration}
+                                                                onWheel={(e) => e.target.blur()} // This removes focus, so scroll won't change value
                                                                 onChange={(e) => updateCustomBreak(index, 'duration', e.target.value)}
                                                                 min="1"
                                                                 max="60"
@@ -305,6 +450,7 @@ const ConfigureStep = ({ sessionData, setSessionData, onNext, onPrev, canGoNext 
                                                             <input
                                                                 type="number"
                                                                 value={breakItem.afterFocusTime}
+                                                                onWheel={(e) => e.target.blur()} // This removes focus, so scroll won't change value
                                                                 onChange={(e) => updateCustomBreak(index, 'afterFocusTime', e.target.value)}
                                                                 min="1"
                                                                 max="480"
@@ -376,8 +522,8 @@ const ConfigureStep = ({ sessionData, setSessionData, onNext, onPrev, canGoNext 
                                 onClick={onNext}
                                 disabled={!isValid()}
                                 className={`px-8 py-3 rounded-xl font-medium transition-all ${isValid()
-                                        ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:shadow-lg'
-                                        : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                                    ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:shadow-lg'
+                                    : 'bg-gray-600 text-gray-400 cursor-not-allowed'
                                     }`}
                                 whileHover={isValid() ? { scale: 1.05 } : {}}
                                 whileTap={isValid() ? { scale: 0.95 } : {}}
