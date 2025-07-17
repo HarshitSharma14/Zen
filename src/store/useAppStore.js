@@ -26,24 +26,31 @@ const useAppStore = create(
                 totalDistractionTime: 0,
                 distractions: [],
 
-                // NEW TRACKING PROPERTIES
+                // UPDATED TRACKING PROPERTIES (removed unknownWindows)
                 windowHistory: [], // Track all window changes with timestamps
                 currentWindowInfo: null, // Current active window details
-                unknownWindows: [], // Windows that need categorization
                 focusViolations: [], // Times when user was on break windows during focus
                 breakViolations: [], // Times when user was on focus windows during break
                 wastedTime: 0, // Total time wasted (on break windows during focus)
                 currentViolation: null, // Active violation being tracked
             },
 
+            // ✅ UPDATED: Store complete window metadata
             updateCurrentWindow: (windowInfo) => set((state) => {
                 const now = new Date();
                 const currentSegment = state.activeSession.currentSegment;
 
-                // Log window change in history
+                // Store complete window metadata in history
                 const newHistoryEntry = {
                     timestamp: now.toISOString(),
-                    window: windowInfo,
+                    window: {
+                        id: windowInfo.id,                    // ✅ Persistent ID
+                        title: windowInfo.title,
+                        owner: windowInfo.owner,
+                        processId: windowInfo.processId,      // ✅ Process info
+                        bundleId: windowInfo.bundleId,        // ✅ Bundle ID (macOS)
+                        path: windowInfo.path                 // ✅ App path
+                    },
                     segmentType: currentSegment?.type || 'unknown',
                     segmentIndex: state.activeSession.timeline.findIndex(s => s === currentSegment)
                 };
@@ -57,28 +64,31 @@ const useAppStore = create(
                 };
             }),
 
-            addUnknownWindow: (windowInfo) => set((state) => ({
-                activeSession: {
-                    ...state.activeSession,
-                    unknownWindows: [...state.activeSession.unknownWindows, windowInfo]
-                }
-            })),
+            // ✅ REMOVED: addUnknownWindow function (no longer needed)
 
+            // ✅ UPDATED: Store complete window metadata when categorizing
             categorizeWindow: (windowId, category, windowInfo) => set((state) => {
-                // Add to appropriate category in session config
+                // Store complete window metadata
+                const windowData = {
+                    id: windowInfo.id,
+                    name: windowInfo.title,          // Keep 'name' for backwards compatibility
+                    title: windowInfo.title,
+                    owner: windowInfo.owner,
+                    processId: windowInfo.processId,
+                    bundleId: windowInfo.bundleId,
+                    path: windowInfo.path
+                };
+
                 const updatedConfig = { ...state.sessionConfig };
                 if (category === 'focus') {
-                    updatedConfig.focusWindows = [...(updatedConfig.focusWindows || []), windowInfo];
+                    updatedConfig.focusWindows = [...(updatedConfig.focusWindows || []), windowData];
                 } else {
-                    updatedConfig.breakWindows = [...(updatedConfig.breakWindows || []), windowInfo];
+                    updatedConfig.breakWindows = [...(updatedConfig.breakWindows || []), windowData];
                 }
 
                 return {
-                    sessionConfig: updatedConfig,
-                    activeSession: {
-                        ...state.activeSession,
-                        unknownWindows: state.activeSession.unknownWindows.filter(w => w.id !== windowId)
-                    }
+                    sessionConfig: updatedConfig
+                    // ✅ REMOVED: unknownWindows cleanup (no longer needed)
                 };
             }),
 
@@ -88,7 +98,14 @@ const useAppStore = create(
                     currentViolation: {
                         type: violationType, // 'focus' or 'break'
                         startTime: new Date().toISOString(),
-                        window: windowInfo,
+                        window: {
+                            id: windowInfo.id,
+                            title: windowInfo.title,
+                            owner: windowInfo.owner,
+                            processId: windowInfo.processId,
+                            bundleId: windowInfo.bundleId,
+                            path: windowInfo.path
+                        },
                         segmentType: state.activeSession.currentSegment?.type
                     }
                 }
@@ -132,9 +149,7 @@ const useAppStore = create(
                 return newState;
             }),
 
-
-
-            // Actions (keep all your existing actions the same)
+            // Actions (keep all your existing actions)
             setCurrentPage: (page) => set({ currentPage: page }),
 
             setUser: (user) => set({
@@ -146,15 +161,16 @@ const useAppStore = create(
                 sessionConfig: config
             }),
 
-            startSession: (config) => {
+            // ✅ UPDATED: Fixed startSession to work with new structure
+            startSession: (config) => set((state) => {
                 const now = new Date();
-                const timeline = config.timeline;
+                const timeline = config?.timeline || state.sessionConfig?.timeline || [];
 
-                set({
-                    sessionConfig: config,
+                return {
+                    sessionConfig: config || state.sessionConfig,
                     activeSession: {
                         isActive: true,
-                        startTime: now.toISOString(), // Store as string for localStorage
+                        startTime: now.toISOString(),
                         currentSegment: timeline[0] || null,
                         timeline: timeline,
                         elapsedTime: 0,
@@ -164,20 +180,28 @@ const useAppStore = create(
                         totalBreakTime: 0,
                         totalDistractionTime: 0,
                         distractions: [],
+                        
+                        // ✅ Initialize new tracking properties
+                        windowHistory: [],
+                        currentWindowInfo: null,
+                        focusViolations: [],
+                        breakViolations: [],
+                        wastedTime: 0,
+                        currentViolation: null,
                     }
-                });
-            },
+                };
+            }),
 
-            // ... rest of your existing actions
-            updateSessionProgress: (elapsedSeconds) => {
-                const state = get();
+            // ✅ UPDATED: Better session progress tracking
+            updateSessionProgress: (elapsedSeconds) => set((state) => {
                 const { activeSession } = state;
 
-                if (!activeSession.isActive) return;
+                if (!activeSession.isActive) return state;
 
                 let cumulativeTime = 0;
                 let currentSegmentIndex = 0;
 
+                // Find current segment
                 for (let i = 0; i < activeSession.timeline.length; i++) {
                     const segment = activeSession.timeline[i];
                     if (elapsedSeconds < cumulativeTime + (segment.duration * 60)) {
@@ -185,21 +209,49 @@ const useAppStore = create(
                         break;
                     }
                     cumulativeTime += segment.duration * 60;
+                    currentSegmentIndex = i + 1; // Move to next if this segment is complete
                 }
 
-                const currentSegment = activeSession.timeline[currentSegmentIndex];
+                const currentSegment = activeSession.timeline[currentSegmentIndex] || null;
                 const segmentStartTime = cumulativeTime;
-                const segmentProgress = elapsedSeconds - segmentStartTime;
+                const segmentProgress = currentSegment 
+                    ? ((elapsedSeconds - segmentStartTime) / (currentSegment.duration * 60)) * 100
+                    : 100;
 
-                set({
+                // Calculate total focus and break time
+                let totalFocusTime = 0;
+                let totalBreakTime = 0;
+
+                for (let i = 0; i < currentSegmentIndex; i++) {
+                    const segment = activeSession.timeline[i];
+                    if (segment.type === 'focus') {
+                        totalFocusTime += segment.duration * 60;
+                    } else {
+                        totalBreakTime += segment.duration * 60;
+                    }
+                }
+
+                // Add current segment progress
+                if (currentSegment) {
+                    const segmentElapsed = elapsedSeconds - segmentStartTime;
+                    if (currentSegment.type === 'focus') {
+                        totalFocusTime += segmentElapsed;
+                    } else {
+                        totalBreakTime += segmentElapsed;
+                    }
+                }
+
+                return {
                     activeSession: {
                         ...activeSession,
                         elapsedTime: elapsedSeconds,
                         currentSegment,
-                        segmentProgress
+                        segmentProgress: Math.min(100, Math.max(0, segmentProgress)),
+                        totalFocusTime,
+                        totalBreakTime
                     }
-                });
-            },
+                };
+            }),
 
             setCurrentWindow: (windowInfo) => set((state) => ({
                 activeSession: {
@@ -225,32 +277,24 @@ const useAppStore = create(
 
             endSession: () => set((state) => ({
                 activeSession: {
+                    ...state.activeSession,
                     isActive: false,
-                    startTime: null,
                     currentSegment: null,
-                    timeline: [],
-                    elapsedTime: 0,
-                    currentWindow: null,
-                    segmentProgress: 0,
-                    totalFocusTime: 0,
-                    totalBreakTime: 0,
-                    totalDistractionTime: 0,
-                    distractions: [],
+                    currentViolation: null
                 }
             }))
         }),
         {
-            name: 'focus-tracker-storage', // localStorage key
+            name: 'focus-tracker-storage',
             partialize: (state) => ({
-                // Only persist these parts of the state
                 sessionConfig: state.sessionConfig,
-                activeSession: state.activeSession,
                 user: state.user,
-                isAuthenticated: state.isAuthenticated
+                isAuthenticated: state.isAuthenticated,
+                // Don't persist activeSession - start fresh each time
+                // Don't persist currentPage - always start at session-setup
             }),
-            // Don't persist currentPage - always start fresh
         }
     )
 )
 
-export default useAppStore
+export default useAppStore;

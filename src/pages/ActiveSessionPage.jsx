@@ -4,7 +4,7 @@ import useAppStore from '../store/useAppStore';
 
 import { windowTracker } from '../services/WindowTracker';
 import { categorizeWindow } from '../utils/windowUtils';
-
+import ImmediateWindowCategorizationDialog from '../components/ImmediateWindowCategorizationDialog';
 const WindowSelectionDialog = ({ isOpen, onClose, onSelect, type, currentFocusWindows = [], currentBreakWindows = [] }) => {
     const [windows, setWindows] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -265,7 +265,6 @@ const useWindowTracking = () => {
         activeSession,
         sessionConfig,
         updateCurrentWindow,
-        addUnknownWindow,
         startViolation,
         endViolation
     } = useAppStore();
@@ -292,13 +291,10 @@ const useWindowTracking = () => {
             const currentSegment = activeSession.currentSegment;
 
             if (category.type === 'unknown') {
-                // New unknown window - will trigger popup in next step
-                addUnknownWindow({
-                    id: Date.now(),
-                    title: windowInfo.title,
-                    owner: windowInfo.owner,
-                    timestamp: new Date().toISOString()
-                });
+                // ✅ NEW: Immediately show categorization dialog
+                console.log('❓ Unknown window detected, showing categorization dialog');
+                setPendingWindow(windowInfo);
+                setShowCategorization(true);
             } else {
                 // Handle violations based on segment type and window type
                 handleWindowViolation(currentSegment?.type, category.type, windowInfo);
@@ -337,6 +333,26 @@ const useWindowTracking = () => {
             windowTracker.stop();
         };
     }, [activeSession.isActive, activeSession.currentSegment]);
+
+    const handleWindowCategorization = (windowInfo, category) => {
+        console.log('✅ User categorized window:', windowInfo.title, 'as', category);
+
+        categorizeWindow(windowInfo.id, category, windowInfo);
+
+        setPendingWindow(null);
+        setShowCategorization(false);
+
+        const currentSegment = activeSession.currentSegment;
+        if (currentSegment) {
+            const segmentType = currentSegment.type;
+
+            if (segmentType === 'focus' && category === 'break') {
+                startViolation('focus', windowInfo);
+            } else if (segmentType === 'break' && category === 'focus') {
+                startViolation('break', windowInfo);
+            }
+        }
+    };
 };
 
 
@@ -352,7 +368,8 @@ const ActiveSessionPage = () => {
     const [showSchedule, setShowSchedule] = useState(false);
     const [showWindowConfig, setShowWindowConfig] = useState(false);
     const [windowConfigType, setWindowConfigType] = useState('focus');
-
+    const [pendingWindow, setPendingWindow] = useState(null);
+    const [showCategorization, setShowCategorization] = useState(false);
     // Calculate current segment index
     const getCurrentSegmentIndex = () => {
         if (!activeSession.timeline || activeSession.timeline.length === 0) return 0;
@@ -370,6 +387,32 @@ const ActiveSessionPage = () => {
 
     useWindowTracking();
 
+    // Handle immediate window categorization
+    const handleWindowCategorization = (windowInfo, category) => {
+        console.log('✅ User categorized window:', windowInfo.title, 'as', category);
+
+        // Store the categorization in the session config
+        categorizeWindow(windowInfo.id, category, windowInfo);
+
+        // Clear pending state
+        setPendingWindow(null);
+        setShowCategorization(false);
+
+        // After categorization, check for violations with the current segment
+        const currentSegment = activeSession.currentSegment;
+        if (currentSegment) {
+            const segmentType = currentSegment.type;
+
+            // Check if this creates a violation
+            if (segmentType === 'focus' && category === 'break') {
+                console.log('⚠️ Categorized as break window during focus - starting violation');
+                startViolation('focus', windowInfo);
+            } else if (segmentType === 'break' && category === 'focus') {
+                console.log('⚠️ Categorized as focus window during break - starting violation');
+                startViolation('break', windowInfo);
+            }
+        }
+    };
 
     const currentSegmentIndex = getCurrentSegmentIndex();
 
@@ -380,7 +423,7 @@ const ActiveSessionPage = () => {
         const interval = setInterval(() => {
             const now = new Date();
             const elapsed = Math.floor((now - new Date(activeSession.startTime)) / 1000);
-            updateSessionProgress(elapsed); 
+            updateSessionProgress(elapsed);
         }, 1000);
 
         return () => clearInterval(interval);
@@ -773,6 +816,14 @@ const ActiveSessionPage = () => {
                     />
                 )}
             </AnimatePresence>
+
+            {/* Immediate Window Categorization Dialog */}
+            <ImmediateWindowCategorizationDialog
+                windowInfo={pendingWindow}
+                isOpen={showCategorization}
+                onCategorize={handleWindowCategorization}
+                onClose={() => { }} // Don't allow closing
+            />
         </div>
     );
 };

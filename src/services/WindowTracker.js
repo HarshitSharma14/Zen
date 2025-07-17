@@ -1,3 +1,4 @@
+// Updated WindowTracker.js
 
 class WindowTracker {
     constructor() {
@@ -39,13 +40,18 @@ class WindowTracker {
 
             if (!windowInfo) return;
 
-            // Check if window changed
-            const windowIdentifier = `${windowInfo.title}-${windowInfo.owner}`;
-            const previousIdentifier = this.currentWindow ?
-                `${this.currentWindow.title}-${this.currentWindow.owner}` : null;
+            // ✅ NEW: Use window ID for comparison instead of title+owner
+            const currentWindowId = windowInfo.id;
+            const previousWindowId = this.currentWindow?.id;
 
-            if (windowIdentifier !== previousIdentifier) {
-                console.log('🪟 Window changed:', windowInfo);
+            if (currentWindowId !== previousWindowId) {
+                console.log('🪟 Window changed:', {
+                    from: this.currentWindow?.title || 'none',
+                    to: windowInfo.title,
+                    fromId: previousWindowId,
+                    toId: currentWindowId
+                });
+                
                 this.currentWindow = windowInfo;
 
                 if (this.onWindowChange) {

@@ -71,19 +71,23 @@ ipcMain.handle('get-available-windows', async () => {
   }
 })
 
+
 ipcMain.handle('get-current-window', async () => {
   try {
     const currentWindow = await activeWin()
     return currentWindow ? {
+      id: currentWindow.id,           // ✅ ADD: Persistent window ID
       title: currentWindow.title,
-      owner: currentWindow.owner.name
+      owner: currentWindow.owner.name,
+      processId: currentWindow.owner.processId,  // ✅ ADD: Process ID for additional matching
+      bundleId: currentWindow.owner.bundleId,   // ✅ ADD: Bundle ID (macOS only)
+      path: currentWindow.owner.path             // ✅ ADD: App path
     } : null
   } catch (error) {
     console.error('Error getting current window:', error)
     return null
   }
 })
-
 // App lifecycle
 app.whenReady().then(createWindow)
 
