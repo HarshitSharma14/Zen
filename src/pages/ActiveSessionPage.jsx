@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import useAppStore from '../store/useAppStore';
 
+import { windowTracker } from '../services/WindowTracker';
+import { categorizeWindow } from '../utils/windowUtils';
+
 const WindowSelectionDialog = ({ isOpen, onClose, onSelect, type, currentFocusWindows = [], currentBreakWindows = [] }) => {
     const [windows, setWindows] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -255,6 +258,88 @@ const ScheduleOverlay = ({ isOpen, onClose, timeline, currentIndex, startTime })
     );
 };
 
+
+// Add this hook inside your ActiveSessionPage component:
+const useWindowTracking = () => {
+    const {
+        activeSession,
+        sessionConfig,
+        updateCurrentWindow,
+        addUnknownWindow,
+        startViolation,
+        endViolation
+    } = useAppStore();
+
+    useEffect(() => {
+        if (!activeSession.isActive) return;
+
+        console.log('🚀 Initializing window tracking...');
+
+        const handleWindowChange = (windowInfo) => {
+            // Update current window in store
+            updateCurrentWindow(windowInfo);
+
+            // Categorize the window
+            const category = categorizeWindow(
+                windowInfo,
+                sessionConfig?.focusWindows || [],
+                sessionConfig?.breakWindows || []
+            );
+
+            console.log('📊 Window categorized as:', category.type, windowInfo);
+
+            // Handle different scenarios based on current segment and window type
+            const currentSegment = activeSession.currentSegment;
+
+            if (category.type === 'unknown') {
+                // New unknown window - will trigger popup in next step
+                addUnknownWindow({
+                    id: Date.now(),
+                    title: windowInfo.title,
+                    owner: windowInfo.owner,
+                    timestamp: new Date().toISOString()
+                });
+            } else {
+                // Handle violations based on segment type and window type
+                handleWindowViolation(currentSegment?.type, category.type, windowInfo);
+            }
+        };
+
+        const handleWindowViolation = (segmentType, windowType, windowInfo) => {
+            // If in focus segment but on break window = violation
+            if (segmentType === 'focus' && windowType === 'break') {
+                if (!activeSession.currentViolation || activeSession.currentViolation.type !== 'focus') {
+                    startViolation('focus', windowInfo);
+                }
+            }
+            // If in break segment but on focus window = violation  
+            else if (segmentType === 'break' && windowType === 'focus') {
+                if (!activeSession.currentViolation || activeSession.currentViolation.type !== 'break') {
+                    startViolation('break', windowInfo);
+                }
+            }
+            // If back to appropriate window type, end any current violation
+            else if (
+                (segmentType === 'focus' && windowType === 'focus') ||
+                (segmentType === 'break' && windowType === 'break')
+            ) {
+                if (activeSession.currentViolation) {
+                    endViolation();
+                }
+            }
+        };
+
+        // Start tracking
+        windowTracker.start(handleWindowChange);
+
+        // Cleanup on unmount
+        return () => {
+            windowTracker.stop();
+        };
+    }, [activeSession.isActive, activeSession.currentSegment]);
+};
+
+
 const ActiveSessionPage = () => {
     const {
         activeSession,
@@ -283,6 +368,9 @@ const ActiveSessionPage = () => {
         return activeSession.timeline.length - 1;
     };
 
+    useWindowTracking();
+
+
     const currentSegmentIndex = getCurrentSegmentIndex();
 
     // Update session progress every second
@@ -292,7 +380,7 @@ const ActiveSessionPage = () => {
         const interval = setInterval(() => {
             const now = new Date();
             const elapsed = Math.floor((now - new Date(activeSession.startTime)) / 1000);
-            updateSessionProgress(elapsed);
+            updateSessionProgress(elapsed); 
         }, 1000);
 
         return () => clearInterval(interval);
