@@ -14,16 +14,6 @@ const SummaryStep = ({ sessionData, onStart, onPrev }) => {
             setCountdown(prev => {
                 if (prev <= 1) {
                     clearInterval(timer);
-
-                    // Prepare complete session config with timeline
-                    const sessionConfig = {
-                        ...sessionData,
-                        timeline: sessionTimeline, // Include the calculated timeline
-                        startTime: new Date()
-                    };
-
-                    // Start session with config
-                    onStart(sessionConfig);
                     return 0;
                 }
                 return prev - 1;
@@ -52,6 +42,21 @@ const SummaryStep = ({ sessionData, onStart, onPrev }) => {
         // Cleanup on unmount
         return () => clearTimeout(timeoutId);
     }, [isStarting]); // Empty dependency array - only run once on mount
+
+    // Watch for countdown completion and start session
+    useEffect(() => {
+        if (isStarting && countdown === 0) {
+            // Prepare complete session config with timeline
+            const sessionConfig = {
+                ...sessionData,
+                timeline: sessionTimeline, // Include the calculated timeline
+                startTime: new Date()
+            };
+
+            // Start session with config
+            onStart(sessionConfig);
+        }
+    }, [isStarting, countdown, sessionData, onStart]);
 
     // Calculate session timeline
     const sessionTimeline = useMemo(() => {

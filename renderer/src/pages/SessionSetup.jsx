@@ -6,11 +6,11 @@ import WindowsStep from '../components/sessionSetupComponents/WindowsStep';
 import SummaryStep from '../components/sessionSetupComponents/SummaryStep';
 
 const SessionSetup = () => {
-    const { setCurrentPage } = useAppStore();
+    const { setCurrentPage, saveSessionConfig, startSession: startActiveSession } = useAppStore();
     const [currentStep, setCurrentStep] = useState(0);
 
     const [sessionData, setSessionData] = useState({
-        sessionName: '',
+        sessionName: 'test',
         totalTime: 60,
         isTimeBound: true,
         isSessionTime: true,
@@ -41,9 +41,6 @@ const SessionSetup = () => {
     };
 
     const startSession = (sessionConfig) => {
-        // Save to Zustand store
-        const { saveSessionConfig, startSession: startActiveSession } = useAppStore.getState();
-
         console.log('Starting session with config:', sessionConfig);
 
         // Save configuration and start the session

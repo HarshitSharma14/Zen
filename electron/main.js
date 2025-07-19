@@ -6,12 +6,11 @@ import fs from 'fs'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-
-let mainWindow
-
-const preloadPath = path.join(__dirname, 'preload.js');
+const preloadPath = path.join(__dirname, 'preload.cjs');
 console.log('Preload path:', preloadPath);
 console.log('Preload exists:', fs.existsSync(preloadPath));
+
+let mainWindow
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -20,7 +19,7 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.resolve(__dirname, 'preload.js') // ✅ Try resolve instead
+      preload: preloadPath
     }
   })
 
@@ -30,7 +29,7 @@ function createWindow() {
     mainWindow.loadURL('http://localhost:5173')
     mainWindow.webContents.openDevTools()
   } else {
-    mainWindow.loadFile('dist/index.html')
+    mainWindow.loadFile(path.join(__dirname, '../renderer/dist/index.html'))
   }
 }
 
@@ -74,10 +73,8 @@ ipcMain.handle('get-available-windows', async () => {
 ipcMain.handle('get-current-window', async () => {
   try {
     const currentWindow = await activeWin()
-    return currentWindow ? {
-      title: currentWindow.title,
-      owner: currentWindow.owner.name
-    } : null
+    // console.log('Current window:', currentWindow)
+    return currentWindow ? currentWindow.id : null
   } catch (error) {
     console.error('Error getting current window:', error)
     return null

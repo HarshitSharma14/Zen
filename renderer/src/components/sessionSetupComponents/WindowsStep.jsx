@@ -235,6 +235,8 @@ const WindowSelectionDialog = ({ isOpen, onClose, onSelect, type, selectedTypeWi
     );
 };
 
+
+
 const WindowsStep = ({ sessionData, setSessionData, onNext, onPrev }) => {
     const [showDialog, setShowDialog] = useState(false);
     const [dialogType, setDialogType] = useState('focus'); // 'focus' or 'break'
@@ -255,7 +257,7 @@ const WindowsStep = ({ sessionData, setSessionData, onNext, onPrev }) => {
 
     // Validation - both focus and break windows should be selected
     const isValid = () => {
-        return sessionData.focusWindows.length > 0;
+        // return sessionData.focusWindows.length > 0;
         return true
     };
 
