@@ -38,7 +38,9 @@ function createWindow() {
 }
 
 function createOverlayWindow() {
-  if (overlayWindow) {
+  console.log('Creating overlay window...')
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    console.log('Closing existing overlay window...')
     overlayWindow.close()
   }
 
@@ -55,6 +57,12 @@ function createOverlayWindow() {
     alwaysOnTop: true,
     skipTaskbar: true,
     focusable: false,
+    resizable: false,
+    movable: false,
+    minimizable: false,
+    maximizable: false,
+    closable: true, // Changed to true to allow closing
+    titleBarStyle: 'hidden',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -65,6 +73,7 @@ function createOverlayWindow() {
   overlayWindow.loadFile(path.join(__dirname, '../renderer/overlay.html'))
 
   overlayWindow.on('closed', () => {
+    console.log('Overlay window closed event fired')
     overlayWindow = null
   })
 }
@@ -391,9 +400,21 @@ ipcMain.handle('select-window-type', async (event, type) => {
       }
 
       // Close the overlay window
-      if (overlayWindow) {
+      if (overlayWindow && !overlayWindow.isDestroyed()) {
+        console.log('Closing overlay window...')
+        const overlayToClose = overlayWindow
         overlayWindow.close()
+        // Force destroy if close doesn't work
+        setTimeout(() => {
+          if (overlayToClose && !overlayToClose.isDestroyed()) {
+            console.log('Force destroying overlay window...')
+            overlayToClose.destroy()
+          }
+        }, 100)
         overlayWindow = null
+        console.log('Overlay window closed')
+      } else {
+        console.log('Overlay window was already destroyed or null')
       }
 
       pendingWindowInfo = null

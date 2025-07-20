@@ -1,5 +1,5 @@
 import './index.css'
-import React, { Suspense } from 'react'
+import React, { Suspense, useEffect } from 'react'
 import useAppStore from './store/useAppStore'
 import PageLoader from './components/PageLoader'
 
@@ -19,7 +19,18 @@ const usePage = () => {
 }
 
 function App() {
+    const { initializeApp } = useAppStore()
     const PageComponent = usePage()
+
+    // Initialize app and check for existing session on mount
+    useEffect(() => {
+        // Small delay to ensure store is hydrated from localStorage
+        const timer = setTimeout(() => {
+            initializeApp()
+        }, 100)
+
+        return () => clearTimeout(timer)
+    }, [initializeApp])
 
     return (
         <Suspense fallback={<PageLoader />}>

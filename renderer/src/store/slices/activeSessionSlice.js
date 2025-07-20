@@ -89,6 +89,7 @@ export const createActiveSessionSlice = (set, get) => ({
             totalBreakTime: 0,
             totalDistractionTime: 0,
             distractions: [],
-        }
+        },
+        sessionConfig: null, // Clear session configuration
     }))
 }); 

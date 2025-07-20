@@ -14,12 +14,22 @@ const ActiveSessionPage = () => {
         setCurrentPage,
         setCurrentWindow,
         currentWindow,
-        updateSessionConfig
+        updateSessionConfig,
+        startSession
     } = useAppStore();
 
     const [showSchedule, setShowSchedule] = useState(false);
     const [showWindowConfig, setShowWindowConfig] = useState(false);
     const [windowConfigType, setWindowConfigType] = useState('focus');
+
+    // Check if we have a valid session on mount
+    useEffect(() => {
+        if (!activeSession.isActive && sessionConfig && sessionConfig.timeline && sessionConfig.timeline.length > 0) {
+            console.log('Found session config but no active session, restarting session');
+            // Restart the session with existing config
+            startSession(sessionConfig);
+        }
+    }, [activeSession.isActive, sessionConfig, startSession]);
 
     // Calculate current segment index
     const getCurrentSegmentIndex = () => {

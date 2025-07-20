@@ -72,7 +72,11 @@
         <div class="p-4 border-b border-white/10">
             <div class="bg-white/5 rounded-lg p-3">
                 <div class="flex items-center gap-3 mb-3">
-                    <img id="appIcon" src="" alt="App Icon" class="w-8 h-8 rounded-lg object-cover hidden">
+                    <div id="appIconContainer"
+                        class="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-600/30">
+                        <img id="appIcon" src="" alt="App Icon" class="w-8 h-8 rounded-lg object-cover hidden">
+                        <span id="appIconFallback" class="text-white/60 text-sm font-medium">📱</span>
+                    </div>
                     <div class="flex-1">
                         <p class="text-white/80 text-sm font-medium mb-1">Window:</p>
                         <p id="windowName" class="text-white text-sm truncate">Loading...</p>
@@ -82,8 +86,9 @@
                     <img id="windowThumbnail" src="" alt="Window Preview"
                         class="w-full h-32 object-cover rounded-lg border border-white/10 hidden">
                     <div id="thumbnailPlaceholder"
-                        class="w-full h-32 bg-white/5 rounded-lg border border-white/10 flex items-center justify-center">
-                        <span class="text-white/40 text-sm">Loading preview...</span>
+                        class="w-full h-32 bg-gradient-to-br from-gray-600/20 to-gray-800/20 rounded-lg border border-white/10 flex flex-col items-center justify-center">
+                        <span class="text-white/40 text-2xl mb-2">🖥️</span>
+                        <span class="text-white/40 text-sm">Preview not available</span>
                     </div>
                 </div>
             </div>
@@ -131,10 +136,37 @@
 
                     // Set app icon if available
                     const appIcon = document.getElementById('appIcon');
+                    const appIconFallback = document.getElementById('appIconFallback');
+
                     if (windowInfo.appIconDataURL) {
                         appIcon.src = windowInfo.appIconDataURL;
                         appIcon.classList.remove('hidden');
+                        appIconFallback.classList.add('hidden');
                         console.log('Set app icon');
+                    } else {
+                        // Show fallback icon
+                        appIcon.classList.add('hidden');
+                        appIconFallback.classList.remove('hidden');
+                        // Try to set a more specific icon based on window name
+                        const windowName = windowInfo.name?.toLowerCase() || '';
+                        if (windowName.includes('chrome') || windowName.includes('browser')) {
+                            appIconFallback.textContent = '🌐';
+                        } else if (windowName.includes('code') || windowName.includes('vs')) {
+                            appIconFallback.textContent = '💻';
+                        } else if (windowName.includes('word') || windowName.includes('document')) {
+                            appIconFallback.textContent = '📄';
+                        } else if (windowName.includes('excel') || windowName.includes('spreadsheet')) {
+                            appIconFallback.textContent = '📊';
+                        } else if (windowName.includes('powerpoint') || windowName.includes('presentation')) {
+                            appIconFallback.textContent = '📽️';
+                        } else if (windowName.includes('spotify') || windowName.includes('music')) {
+                            appIconFallback.textContent = '🎵';
+                        } else if (windowName.includes('discord') || windowName.includes('chat')) {
+                            appIconFallback.textContent = '💬';
+                        } else {
+                            appIconFallback.textContent = '📱';
+                        }
+                        console.log('Using fallback app icon');
                     }
 
                     // Set window thumbnail if available
@@ -146,6 +178,11 @@
                         windowThumbnail.classList.remove('hidden');
                         thumbnailPlaceholder.classList.add('hidden');
                         console.log('Set window thumbnail');
+                    } else {
+                        // Show fallback for thumbnail
+                        windowThumbnail.classList.add('hidden');
+                        thumbnailPlaceholder.classList.remove('hidden');
+                        console.log('Using fallback thumbnail');
                     }
                 } else {
                     console.log('No window info received');
