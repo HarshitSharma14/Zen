@@ -6,7 +6,11 @@ export const createSessionConfigSlice = (set, get) => ({
     saveSessionConfig: (config) => set({
         sessionConfig: config
     }),
-}); 
+
+    updateSessionConfig: (updates) => set((state) => ({
+        sessionConfig: state.sessionConfig ? { ...state.sessionConfig, ...updates } : updates
+    })),
+});
 
 // {
 //     sessionName: 'test',

@@ -10,7 +10,6 @@ const WindowSelectionDialog = ({ isOpen, onClose, onSelect, type, selectedTypeWi
     const fetchWindows = async () => {
         setLoading(true);
         try {
-
             const availableWindows = await window.electronAPI.getAvailableWindows();
             console.log(availableWindows)// Call Electron API to get available windows
             setWindows(availableWindows);
@@ -31,7 +30,7 @@ const WindowSelectionDialog = ({ isOpen, onClose, onSelect, type, selectedTypeWi
         if (isOpen) {
             fetchWindows();
             setSelectedWindows(selectedTypeWindows);
-            // console.log(selectedTypeWindows)
+            console.log(selectedTypeWindows)
             // console.log(selectedOtherTypeWindows)
             // console.log(selectedWindows)
         }
@@ -249,9 +248,9 @@ const WindowsStep = ({ sessionData, setSessionData, onNext, onPrev }) => {
 
     const handleWindowSelection = (windows) => {
         if (dialogType === 'focus') {
-            setSessionData(prev => ({ ...prev, focusWindows: windows }));
+            setSessionData(prev => ({ ...prev, focusWindows: windows.map(window => ({ id: window.id, name: window.name, appIcon: window.appIcon })) }));
         } else {
-            setSessionData(prev => ({ ...prev, breakWindows: windows }));
+            setSessionData(prev => ({ ...prev, breakWindows: windows.map(window => ({ id: window.id, name: window.name, appIcon: window.appIcon })) }));
         }
     };
 
@@ -439,7 +438,7 @@ const WindowsStep = ({ sessionData, setSessionData, onNext, onPrev }) => {
                                 >
                                     {sessionData.breakWindows.map((window) => (
                                         <motion.div
-                                            key={window.id}
+                                            key={window}
                                             className="flex items-center gap-4 p-4 bg-orange-500/20 border border-orange-400/30 rounded-xl hover:bg-orange-500/30 transition-all"
                                             variants={windowVariants}
                                             whileHover={{ scale: 1.02 }}

@@ -4,6 +4,7 @@ import useAppStore from '../store/useAppStore';
 import { ScheduleOverlay } from '../components/activeSessionComponents/ScheduleOverlay';
 import { WindowSelectionDialog } from '../components/activeSessionComponents/WinowSelectionDialogBox';
 
+
 const ActiveSessionPage = () => {
     const {
         activeSession,
@@ -12,7 +13,8 @@ const ActiveSessionPage = () => {
         endSession,
         setCurrentPage,
         setCurrentWindow,
-        currentWindow
+        currentWindow,
+        updateSessionConfig
     } = useAppStore();
 
     const [showSchedule, setShowSchedule] = useState(false);
@@ -42,18 +44,61 @@ const ActiveSessionPage = () => {
         const interval = setInterval(async () => {
             const currentWindow = await window.electronAPI.getCurrentWindow()
             console.log(currentWindow)
-            setCurrentWindow(currentWindow)
+            if (currentWindow)
+                setCurrentWindow(currentWindow)
         }, 1000)
 
         return () => clearInterval(interval)
     }, [])
 
+    // Listen for window type selection
+    useEffect(() => {
+        const handleWindowTypeSelected = (data) => {
+            const { windowInfo, type } = data;
+
+            console.log(sessionConfig.focusWindows)
+
+            // Update session config with the new window
+            const updatedConfig = {
+                focusWindows: type === 'focus'
+                    ? [...sessionConfig.focusWindows, { name: windowInfo.name, appIcon: windowInfo.appIconDataURL, id: windowInfo.id }]
+                    : sessionConfig.focusWindows,
+                breakWindows: type === 'break'
+                    ? [...sessionConfig.breakWindows, { name: windowInfo.name, appIcon: windowInfo.appIconDataURL, id: windowInfo.id }]
+                    : sessionConfig.breakWindows
+            };
+
+            // Update the store
+            updateSessionConfig(updatedConfig);
+            console.log('Window type selected:', type, 'for window:', windowInfo);
+        };
+
+        window.electronAPI.onWindowTypeSelected(handleWindowTypeSelected);
+
+        return () => {
+            // Cleanup listener if needed
+        };
+    }, [sessionConfig]);
+
 
     useEffect(() => {
-        if (!sessionConfig.focusWindows.includes(currentWindow) && !sessionConfig.breakWindows.includes(currentWindow)) {
-            
+        async function openDialog() {
+            console.log('currentWindow', activeSession.currentWindow)
+            console.log('sessionConfig.focusWindows', sessionConfig.focusWindows)
+            console.log('sessionConfig.breakWindows', sessionConfig.breakWindows)
+            const old = sessionConfig.focusWindows.some((window) => {
+                return window.id === activeSession.currentWindow.id
+            }) || sessionConfig.breakWindows.some((window) => {
+                return window.id === activeSession.currentWindow.id
+            })
+            if (activeSession.currentWindow && !old) {
+                console.log('in')
+                // Show the dialog for new window
+                await window.electronAPI.showNewWindowDialog(activeSession.currentWindow);
+            }
         }
-    }, [currentWindow])
+        openDialog()
+    }, [activeSession.currentWindow])
 
 
     // Update session progress every second
@@ -110,11 +155,6 @@ const ActiveSessionPage = () => {
         setShowWindowConfig(true);
     };
 
-    const handleWindowSelection = (windows) => {
-        // Update the session config with new windows
-        // For now, just close the dialog - you can implement the actual update logic
-        setShowWindowConfig(false);
-    };
 
     if (!activeSession.isActive) {
         return (
@@ -451,13 +491,12 @@ const ActiveSessionPage = () => {
                     <WindowSelectionDialog
                         isOpen={showWindowConfig}
                         onClose={() => setShowWindowConfig(false)}
-                        onSelect={handleWindowSelection}
                         type={windowConfigType}
-                        currentFocusWindows={sessionConfig?.focusWindows || []}
-                        currentBreakWindows={sessionConfig?.breakWindows || []}
                     />
                 )}
             </AnimatePresence>
+
+
         </div>
     );
 };

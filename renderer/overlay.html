@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Overlay</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(2px);
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+            pointer-events: auto;
+        }
+
+        /* Prevent any interaction */
+        * {
+            pointer-events: none;
+        }
+
+        body {
+            pointer-events: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- This overlay captures all mouse and keyboard events -->
+    <script>
+        // Prevent all interactions
+        document.addEventListener('mousedown', (e) => e.preventDefault());
+        document.addEventListener('mouseup', (e) => e.preventDefault());
+        document.addEventListener('click', (e) => e.preventDefault());
+        document.addEventListener('keydown', (e) => e.preventDefault());
+        document.addEventListener('keyup', (e) => e.preventDefault());
+        document.addEventListener('contextmenu', (e) => e.preventDefault());
+
+        // Prevent text selection
+        document.addEventListener('selectstart', (e) => e.preventDefault());
+        document.addEventListener('dragstart', (e) => e.preventDefault());
+    </script>
+</body>
+
+</html>

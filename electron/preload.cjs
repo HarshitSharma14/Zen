@@ -10,8 +10,23 @@ try {
             return ipcRenderer.invoke('get-available-windows');
         },
         getCurrentWindow: () => {
-            console.log('📡 getCurrentWindow called');
+            // console.log('📡 getCurrentWindow called');
             return ipcRenderer.invoke('get-current-window');
+        },
+        getNewWindowInfo: () => {
+            console.log('📡 getNewWindowInfo called');
+            return ipcRenderer.invoke('get-new-window-info');
+        },
+        selectWindowType: (type) => {
+            console.log('📡 selectWindowType called with:', type);
+            return ipcRenderer.invoke('select-window-type', type);
+        },
+        showNewWindowDialog: (windowId) => {
+            console.log('📡 showNewWindowDialog called with:', windowId);
+            return ipcRenderer.invoke('show-new-window-dialog', windowId);
+        },
+        onWindowTypeSelected: (callback) => {
+            ipcRenderer.on('window-type-selected', (event, data) => callback(data));
         }
     });
     console.log('✅ electronAPI exposed successfully');
