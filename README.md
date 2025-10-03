@@ -1,0 +1,1 @@
+A focus tracking desktop app that gamifies productivity through social features. Built with Electron and React, Zen monitors work sessions in real-time, detects distractions, and enables multiplayer study sessions with shared break lobbies. Users can compete in Study Marathons with live scoring powered by Socket.io, making productivity both measurable and fun.
